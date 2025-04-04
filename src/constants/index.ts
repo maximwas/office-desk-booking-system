@@ -1,2 +1,2 @@
-export const USER_SCHEMA_NAME = 'Users';
-export const COOKIE_JWT_NAME = 'jwt';
+export const USER_SCHEMA_NAME = 'User';
+export const COOKIE_REFRESH_TOKEN = 'refreshToken';

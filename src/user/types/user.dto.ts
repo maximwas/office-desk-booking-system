@@ -1,8 +1,8 @@
-import { Users } from './users.schema';
+import { User } from '../schema/user.schema';
 import { OmitType } from '@nestjs/mapped-types';
 import { IsDate, IsEmail, IsOptional, IsString, Length } from 'class-validator';
 
-export class UserPayload extends Users {
+export class UserPayload extends User {
   @IsDate()
   @IsOptional()
   createdA?: string;
@@ -29,4 +29,8 @@ export class LoginUserInput extends OmitType(CreateUserInput, [
   'fullName',
 ] as const) {}
 
-export class UserData extends OmitType(Users, ['password'] as const) {}
+export class UserData extends OmitType(User, [
+  'password',
+  'fullName',
+  'refreshToken',
+] as const) {}
