@@ -1,13 +1,14 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { compare, hash } from 'bcrypt';
 import { AuthPayload } from './types/auth.payload';
-import { CreateUserInput, UserData } from 'src/modules/user/types/user.dto';
+import { CreateUserInput } from 'src/modules/user/types/user.dto';
 import { UserService } from 'src/modules/user/user.service';
 import { Response } from 'express';
 import { COOKIE_REFRESH_TOKEN } from 'src/core/constants';
 import { ConfigService } from '@nestjs/config';
 import { isDev } from 'src/shared/utils/is-dev.until';
+import { TokenPayload } from './types/token.payload';
 
 @Injectable()
 export class AuthService {
@@ -16,17 +17,6 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
   ) {}
-
-  async verifyToken(token: string): Promise<boolean> {
-    try {
-      const payload = await this.jwtService.verifyAsync<UserData>(token);
-      const userExists = await this.userService.findByEmail(payload.email);
-
-      return !!userExists;
-    } catch {
-      return false;
-    }
-  }
 
   public async verifyEmail(email: string) {
     const user = await this.userService.findByEmail(email);
@@ -38,70 +28,81 @@ export class AuthService {
     return;
   }
 
-  public async verifyUser(
-    email: string,
-    password: string,
-  ): Promise<UserData | null> {
+  public async verifyUser(email: string, password: string): Promise<TokenPayload | null> {
     const user = await this.userService.findByEmail(email);
 
     if (user && (await compare(password, user.password))) {
       return {
-        _id: user._id,
-        email: user.email,
+        userId: user._id.toString(),
       };
     }
 
     return null;
   }
 
-  public async register(
-    userInput: CreateUserInput,
-    res: Response,
-  ): Promise<AuthPayload> {
+  public async verifyUserRefreshToken(refreshToken: string, payload: TokenPayload): Promise<TokenPayload> {
+    const user = await this.userService.findById(payload.userId);
+
+    if (user && user.refreshToken) {
+      const authenticated = await compare(refreshToken, user.refreshToken);
+
+      if (!authenticated) {
+        throw new UnauthorizedException('Refresh token is not valid');
+      }
+    }
+
+    return {
+      userId: payload.userId,
+    };
+  }
+
+  public async register(userInput: CreateUserInput, res: Response): Promise<void | AuthPayload> {
     await this.verifyEmail(userInput.email);
 
     const user = await this.userService.create(userInput);
 
     return await this.login(
       {
-        _id: user._id,
-        email: user.email,
+        userId: user._id.toString(),
       },
       res,
     );
   }
 
-  public async login(user: UserData, res: Response): Promise<AuthPayload> {
+  public async login(user: TokenPayload, res: Response, redirect?: boolean): Promise<void | AuthPayload> {
     const jwtToken = await this.jwtService.signAsync(user, {
-      expiresIn: this.configService.getOrThrow<string>('JWT_TOKEN_TIME'),
+      expiresIn: `${this.configService.getOrThrow<string>('JWT_TOKEN_TIME')}s`,
     });
 
     await this.createRefreshToken(user, res);
+
+    if (redirect) {
+      return res.redirect(this.configService.getOrThrow<string>('PATH_HOME_PAGE'));
+    }
 
     return {
       access_token: jwtToken,
     };
   }
 
-  private async createRefreshToken(user: UserData, res: Response) {
+  public logout(res: Response) {
+    res.clearCookie(COOKIE_REFRESH_TOKEN);
+
+    return null;
+  }
+
+  private async createRefreshToken(user: TokenPayload, res: Response) {
     const expiresRefreshToken = new Date();
-    expiresRefreshToken.setTime(
-      expiresRefreshToken.getTime() +
-        parseInt(
-          this.configService.getOrThrow<string>('JWT_REFRESH_TOKEN_TIME'),
-          10,
-        ) *
-          1000,
-    );
+    expiresRefreshToken.setTime(expiresRefreshToken.getTime() + parseInt(this.configService.getOrThrow<string>('JWT_REFRESH_TOKEN_TIME'), 10) * 1000);
 
     const refreshToken = await this.jwtService.signAsync(user, {
-      expiresIn: process.env.JWT_TOKEN_TIME,
+      expiresIn: `${this.configService.getOrThrow<string>('JWT_REFRESH_TOKEN_TIME')}s`,
     });
 
-    await this.userService.update(
-      { _id: user._id },
-      { $set: { refreshToken: await hash(refreshToken, 10) } },
-    );
+    const payload = await this.jwtService.verifyAsync(refreshToken);
+    console.log('🚀 ~ AuthService ~ createRefreshToken ~ payload:', payload);
+
+    await this.userService.updateById(user.userId, { $set: { refreshToken: await hash(refreshToken, 10) } });
 
     res.cookie(COOKIE_REFRESH_TOKEN, refreshToken, {
       httpOnly: true,

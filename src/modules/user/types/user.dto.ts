@@ -25,12 +25,4 @@ export class CreateUserInput {
   password: string;
 }
 
-export class LoginUserInput extends OmitType(CreateUserInput, [
-  'fullName',
-] as const) {}
-
-export class UserData extends OmitType(User, [
-  'password',
-  'fullName',
-  'refreshToken',
-] as const) {}
+export class LoginUserInput extends OmitType(CreateUserInput, ['fullName'] as const) {}

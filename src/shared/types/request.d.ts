@@ -1,8 +1,11 @@
-import { UserData } from 'src/users/users.dto';
+import { TokenPayload } from 'src/modules/auth/types/token.payload';
 
 declare module 'express' {
   interface Request {
-    user: UserData;
+    user: TokenPayload;
+    cookies: {
+      Refresh: string;
+    };
   }
 }
 

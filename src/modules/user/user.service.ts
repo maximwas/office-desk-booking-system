@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { FilterQuery, Model, UpdateQuery } from 'mongoose';
+import { Model, Types, UpdateQuery } from 'mongoose';
 import { hash } from 'bcrypt';
 import { User } from './schema/user.schema';
 import { UserPayload, CreateUserInput } from './types/user.dto';
@@ -18,12 +18,24 @@ export class UserService {
     return await user.save();
   }
 
-  async update(query: FilterQuery<User>, data: UpdateQuery<User>) {
-    return await this.userModel.findOneAndUpdate(query, data);
+  async updateById(id: string, data: UpdateQuery<User>) {
+    return await this.userModel.findOneAndUpdate({ _id: new Types.ObjectId(id) }, data);
   }
 
   public async findByEmail(email: string): Promise<UserPayload | null> {
     const user = await this.userModel.findOne({ email }).exec();
+
+    return user;
+  }
+
+  public async findById(id: string): Promise<UserPayload | null> {
+    const user = await this.userModel.findOne({ _id: new Types.ObjectId(id) }).exec();
+
+    return user;
+  }
+
+  public async getAll(): Promise<UserPayload[] | null> {
+    const user = await this.userModel.find().exec();
 
     return user;
   }
