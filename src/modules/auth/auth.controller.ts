@@ -7,7 +7,7 @@ import {
   Response,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { CreateUserInput } from 'src/user/types/user.dto';
+import { CreateUserInput } from 'src/modules/user/types/user.dto';
 import {
   Request as ExpressRequest,
   Response as ExpressResponse,

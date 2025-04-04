@@ -2,16 +2,19 @@ import { ConflictException, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { compare, hash } from 'bcrypt';
 import { AuthPayload } from './types/auth.payload';
-import { CreateUserInput, UserData } from 'src/user/types/user.dto';
-import { UserService } from 'src/user/user.service';
+import { CreateUserInput, UserData } from 'src/modules/user/types/user.dto';
+import { UserService } from 'src/modules/user/user.service';
 import { Response } from 'express';
-import { COOKIE_REFRESH_TOKEN } from 'src/constants';
+import { COOKIE_REFRESH_TOKEN } from 'src/core/constants';
+import { ConfigService } from '@nestjs/config';
+import { isDev } from 'src/shared/utils/is-dev.until';
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly userService: UserService,
     private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
   ) {}
 
   async verifyToken(token: string): Promise<boolean> {
@@ -68,18 +71,12 @@ export class AuthService {
     );
   }
 
-  public async login(
-    user: UserData,
-    res: Response,
-    refresh: boolean = false,
-  ): Promise<AuthPayload> {
+  public async login(user: UserData, res: Response): Promise<AuthPayload> {
     const jwtToken = await this.jwtService.signAsync(user, {
-      expiresIn: process.env.JWT_REFRESH_TOKEN_TIME,
+      expiresIn: this.configService.getOrThrow<string>('JWT_TOKEN_TIME'),
     });
 
-    if (!refresh) {
-      await this.createRefreshToken(user, res);
-    }
+    await this.createRefreshToken(user, res);
 
     return {
       access_token: jwtToken,
@@ -90,7 +87,11 @@ export class AuthService {
     const expiresRefreshToken = new Date();
     expiresRefreshToken.setTime(
       expiresRefreshToken.getTime() +
-        parseInt(process.env.JWT_REFRESH_TOKEN_TIME, 10) * 1000,
+        parseInt(
+          this.configService.getOrThrow<string>('JWT_REFRESH_TOKEN_TIME'),
+          10,
+        ) *
+          1000,
     );
 
     const refreshToken = await this.jwtService.signAsync(user, {
@@ -104,7 +105,7 @@ export class AuthService {
 
     res.cookie(COOKIE_REFRESH_TOKEN, refreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: !isDev(this.configService),
       expires: expiresRefreshToken,
     });
   }
