@@ -1,13 +1,14 @@
 import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { compare, hash } from 'bcrypt';
-import { AuthPayload } from './types/auth.payload';
-import { CreateUserInput } from 'src/modules/user/types/user.dto';
-import { UserService } from 'src/modules/user/user.service';
 import { Response } from 'express';
 import { COOKIE_REFRESH_TOKEN } from 'src/core/constants';
-import { ConfigService } from '@nestjs/config';
+import { CreateUserInput } from 'src/modules/user/types/user.dto';
+import { UserService } from 'src/modules/user/user.service';
 import { isDev } from 'src/shared/utils/is-dev.until';
+
+import { AuthPayload } from './types/auth.payload';
 import { TokenPayload } from './types/token.payload';
 
 @Injectable()
