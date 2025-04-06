@@ -100,9 +100,6 @@ export class AuthService {
       expiresIn: `${this.configService.getOrThrow<string>('JWT_REFRESH_TOKEN_TIME')}s`,
     });
 
-    const payload = await this.jwtService.verifyAsync(refreshToken);
-    console.log('🚀 ~ AuthService ~ createRefreshToken ~ payload:', payload);
-
     await this.userService.updateById(user.userId, { $set: { refreshToken: await hash(refreshToken, 10) } });
 
     res.cookie(COOKIE_REFRESH_TOKEN, refreshToken, {
