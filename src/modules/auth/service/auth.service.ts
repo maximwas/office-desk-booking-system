@@ -4,23 +4,22 @@ import { JwtService } from '@nestjs/jwt';
 import { compare, hash } from 'bcrypt';
 import { Response } from 'express';
 import { COOKIE_REFRESH_TOKEN } from 'src/core/constants';
+import { UserRepository } from 'src/modules/user/repository/user.repository';
 import { CreateUserInput } from 'src/modules/user/types/user.dto';
-import { UserService } from 'src/modules/user/user.service';
 import { isDev } from 'src/shared/utils/is-dev.until';
 
-import { AuthPayload } from './types/auth.payload';
-import { TokenPayload } from './types/token.payload';
+import { TokenPayload } from '../types/token.payload';
 
 @Injectable()
 export class AuthService {
   constructor(
-    private readonly userService: UserService,
+    private readonly userRepo: UserRepository,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
   ) {}
 
   public async verifyEmail(email: string) {
-    const user = await this.userService.findByEmail(email);
+    const user = await this.userRepo.findByEmail(email);
 
     if (user) {
       throw new ConflictException('A user with this email already exists');
@@ -29,8 +28,8 @@ export class AuthService {
     return;
   }
 
-  public async verifyUser(email: string, password: string): Promise<TokenPayload | null> {
-    const user = await this.userService.findByEmail(email);
+  public async verifyUser(email: string, password: string) {
+    const user = await this.userRepo.findByEmail(email);
 
     if (user && (await compare(password, user.password))) {
       return {
@@ -41,8 +40,8 @@ export class AuthService {
     return null;
   }
 
-  public async verifyUserRefreshToken(refreshToken: string, payload: TokenPayload): Promise<TokenPayload> {
-    const user = await this.userService.findById(payload.userId);
+  public async verifyUserRefreshToken(refreshToken: string, payload: TokenPayload) {
+    const user = await this.userRepo.findById(payload.userId);
 
     if (user && user.refreshToken) {
       const authenticated = await compare(refreshToken, user.refreshToken);
@@ -57,10 +56,14 @@ export class AuthService {
     };
   }
 
-  public async register(userInput: CreateUserInput, res: Response): Promise<void | AuthPayload> {
+  public async register(userInput: CreateUserInput, res: Response) {
     await this.verifyEmail(userInput.email);
 
-    const user = await this.userService.create(userInput);
+    const hashPassword = await hash(userInput.password, 10);
+    const user = await this.userRepo.create({
+      ...userInput,
+      password: hashPassword,
+    });
 
     return await this.login(
       {
@@ -70,7 +73,7 @@ export class AuthService {
     );
   }
 
-  public async login(user: TokenPayload, res: Response, redirect?: boolean): Promise<void | AuthPayload> {
+  public async login(user: TokenPayload, res: Response, redirect?: boolean) {
     const jwtToken = await this.jwtService.signAsync(user, {
       expiresIn: `${this.configService.getOrThrow<string>('JWT_TOKEN_TIME')}s`,
     });
@@ -100,7 +103,7 @@ export class AuthService {
       expiresIn: `${this.configService.getOrThrow<string>('JWT_REFRESH_TOKEN_TIME')}s`,
     });
 
-    await this.userService.updateById(user.userId, { $set: { refreshToken: await hash(refreshToken, 10) } });
+    await this.userRepo.updateById(user.userId, { $set: { refreshToken: await hash(refreshToken, 10) } });
 
     res.cookie(COOKIE_REFRESH_TOKEN, refreshToken, {
       httpOnly: true,
