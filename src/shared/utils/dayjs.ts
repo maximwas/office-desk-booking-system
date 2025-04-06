@@ -54,13 +54,13 @@ export const getStartAndEndOfDay = (startDate: Date | string, endDate?: Date | s
   if (!endDate) {
     return {
       startOfDay: dayjs.utc(startDate).startOf('day').toDate(),
-      endOfDay: dayjs.utc(startDate).startOf('day').toDate(),
+      endOfDay: dayjs.utc(startDate).endOf('day').toDate(),
     };
   }
 
   return {
     startOfDay: dayjs.utc(startDate).startOf('day').toDate(),
-    endOfDay: dayjs.utc(endDate).startOf('day').toDate(),
+    endOfDay: dayjs.utc(endDate).endOf('day').toDate(),
   };
 };
 

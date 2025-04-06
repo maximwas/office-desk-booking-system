@@ -16,6 +16,8 @@ export class DeskService {
   ) {}
 
   public async create(body: CreateDeskInput) {
+    await this.verifyNumberDesk(body.number);
+
     const desk = await this.deskRepo.create(body);
 
     return desk;
@@ -65,7 +67,6 @@ export class DeskService {
 
   public async getTimeFreeSlots(deskId: string, date: Date) {
     const { startOfDay, endOfDay } = getStartAndEndOfDay(date);
-
     const bookings = await this.bookingRepo.findByDeskAndPeriod(deskId, startOfDay, endOfDay);
 
     if (!bookings.length) {

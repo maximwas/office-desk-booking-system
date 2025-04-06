@@ -34,7 +34,7 @@ export class BookingRepository {
 
   async findByDeskAndPeriod(deskId: string, startDate: Date, endDate: Date) {
     const bookingPeriodDay = await this.bookingModel.find({
-      deskId,
+      deskId: new Types.ObjectId(deskId),
       $or: [
         {
           startDate: { $lt: endDate },
