@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 
 import { JwtAuthGuard } from '../auth/guard/jwt-auth.guard';
 import { DeskService } from './service/desk.service';
@@ -13,31 +13,31 @@ export class DeskController {
 
   @Post()
   @UseGuards(JwtAuthGuard)
-  createDesk(@Body() body: CreateDeskInput) {
+  create(@Body() body: CreateDeskInput) {
     return this.deskService.create(body);
   }
 
-  @Delete(':id')
+  @Delete('/:id')
   @UseGuards(JwtAuthGuard)
-  deleteDesk(@Param('id') id: string) {
-    return this.deskService.delete(id);
+  deleteById(@Param('id') id: string) {
+    return this.deskService.deleteById(id);
   }
 
-  @Patch(':id')
+  @Patch('/:id')
   @UseGuards(JwtAuthGuard)
-  updateDesk(@Param('id') id: string, @Body() body: UpdateDeskInput) {
-    return this.deskService.update(id, body);
+  updateById(@Param('id') id: string, @Body() body: UpdateDeskInput) {
+    return this.deskService.updateById(id, body);
+  }
+
+  @Get('/:id/time-slots/:date')
+  @UseGuards(JwtAuthGuard)
+  getTimeFreeSlots(@Param('id') id: string, @Param('date') date: Date) {
+    return this.deskService.getTimeFreeSlots(id, date);
   }
 
   @Delete()
   @UseGuards(JwtAuthGuard)
-  deleteDeskAll() {
+  deleteAll() {
     return this.deskService.deleteAll();
-  }
-
-  @Get('/time-slots')
-  @UseGuards(JwtAuthGuard)
-  getTimeFreeSlots(@Query('id') id: string, @Query('date') date: Date) {
-    return this.deskService.getTimeFreeSlots(id, date);
   }
 }

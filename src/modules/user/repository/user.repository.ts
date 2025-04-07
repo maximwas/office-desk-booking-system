@@ -14,8 +14,16 @@ export class UserRepository {
     return await user.save();
   }
 
-  async updateById(id: string, data: UpdateQuery<User>) {
-    return await this.userModel.findOneAndUpdate({ _id: new Types.ObjectId(id) }, data);
+  async updateById(id: string, data: Partial<User>) {
+    const user = await this.update(id, data);
+
+    return user;
+  }
+
+  async update(id: string, data: UpdateQuery<User>) {
+    const user = await this.userModel.findOneAndUpdate({ _id: new Types.ObjectId(id) }, data);
+
+    return user;
   }
 
   public async findByEmail(email: string) {

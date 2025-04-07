@@ -1,6 +1,9 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { InjectConnection } from '@nestjs/mongoose';
+import { ClientSession, Connection } from 'mongoose';
 import { BOOKING_CONFIG, BookingConfig } from 'src/core/config/booking.config';
 import { BookingRepository } from 'src/modules/booking/repository/booking.repository';
+import { Transactional } from 'src/shared/decorators/transactional.decorator';
 import dayjs, { generateTimeSlots, getStartAndEndOfDay } from 'src/shared/utils/dayjs';
 
 import { DeskRepository } from '../repository/desk.repository';
@@ -10,6 +13,7 @@ import { CreateDeskInput, UpdateDeskInput } from '../types/desk.dto';
 export class DeskService {
   constructor(
     @Inject(BOOKING_CONFIG) private readonly bookingConfig: BookingConfig,
+    @InjectConnection() private readonly connection: Connection,
     private readonly deskRepo: DeskRepository,
     private readonly bookingRepo: BookingRepository,
   ) {}
@@ -22,20 +26,27 @@ export class DeskService {
     return desk;
   }
 
-  public async update(id: string, body: UpdateDeskInput) {
+  public async updateById(id: string, body: UpdateDeskInput) {
     await this.verifyNumberDesk(body.number);
 
-    const desk = await this.deskRepo.updateById(id, {
-      $set: {
-        ...body,
-      },
-    });
+    const desk = await this.deskRepo.updateById(id, body);
+
+    if (!desk) {
+      throw new NotFoundException('Desk not found');
+    }
 
     return desk;
   }
 
-  public async delete(id: string) {
-    const desk = await this.deskRepo.delete(id);
+  @Transactional()
+  public async deleteById(id: string, session?: ClientSession) {
+    const desk = await this.deskRepo.deleteById(id, session);
+
+    if (!desk) {
+      throw new NotFoundException('Desk not found');
+    }
+
+    await this.bookingRepo.deleteManyByIds(desk.bookings, session);
 
     return desk;
   }
@@ -46,17 +57,13 @@ export class DeskService {
     return desk;
   }
 
-  public async verifyNumberDesk(number?: number) {
-    if (!number) return null;
-
-    const desk = await this.deskRepo.findByNumber(number);
-
-    if (desk) {
-      throw new ConflictException('Desk with this number already exists');
-    }
-  }
-
   public async getTimeFreeSlots(deskId: string, date: Date) {
+    const desk = await this.deskRepo.findById(deskId);
+
+    if (!desk) {
+      throw new NotFoundException('Desk not found');
+    }
+
     const { startOfDay, endOfDay } = getStartAndEndOfDay(date);
     const bookings = await this.bookingRepo.findByDeskAndPeriod(deskId, startOfDay, endOfDay);
 
@@ -75,5 +82,15 @@ export class DeskService {
     });
 
     return slots;
+  }
+
+  public async verifyNumberDesk(number?: number) {
+    if (!number) return null;
+
+    const desk = await this.deskRepo.findByNumber(number);
+
+    if (desk) {
+      throw new ConflictException('Desk with this number already exists');
+    }
   }
 }

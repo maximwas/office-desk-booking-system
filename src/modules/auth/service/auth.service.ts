@@ -103,7 +103,7 @@ export class AuthService {
       expiresIn: `${this.configService.getOrThrow<string>('JWT_REFRESH_TOKEN_TIME')}s`,
     });
 
-    await this.userRepo.updateById(user.userId, { $set: { refreshToken: await hash(refreshToken, 10) } });
+    await this.userRepo.updateById(user.userId, { refreshToken: await hash(refreshToken, 10) });
 
     res.cookie(COOKIE_REFRESH_TOKEN, refreshToken, {
       httpOnly: true,

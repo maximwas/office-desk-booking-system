@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, RootFilterQuery, Types, UpdateQuery } from 'mongoose';
+import { ClientSession, Model, RootFilterQuery, Types, UpdateQuery } from 'mongoose';
 import { getStartAndEndOfDay } from 'src/shared/utils/dayjs';
 
 import { Booking, BookingDocument } from '../schema/booking.schema';
@@ -20,13 +20,35 @@ export class BookingRepository {
     return booking;
   }
 
-  public async updateById(id: string, data: UpdateQuery<Booking>) {
+  public async updateById(id: string, data: Partial<Booking>) {
+    const booking = await this.update(id, {
+      $set: {
+        ...data,
+      },
+    });
+
+    return booking;
+  }
+
+  public async deleteById(id: string) {
+    const booking = await this.bookingModel.findOneAndDelete(new Types.ObjectId(id)).exec();
+
+    return booking;
+  }
+
+  public async deleteManyByIds(ids: Types.ObjectId[], session?: ClientSession) {
+    const booking = await this.bookingModel.deleteMany({ _id: { $in: ids } }, { session }).exec();
+
+    return booking;
+  }
+
+  public async update(id: string, data: UpdateQuery<Booking>) {
     const booking = await this.bookingModel.findByIdAndUpdate(new Types.ObjectId(id), data, { new: true }).exec();
 
     return booking;
   }
 
-  public async findByUserAndAllDay(userId: string, startDate: Date, endDate: Date) {
+  public async findByUserAndAllDay(userId: string, startDate: Date, endDate: Date, maxPeriod: number) {
     const { startOfDay, endOfDay } = getStartAndEndOfDay(startDate, endDate);
 
     const bookingAllDay = await this.bookingModel
@@ -35,6 +57,7 @@ export class BookingRepository {
         startDate: { $lte: endOfDay },
         endDate: { $gte: startOfDay },
       })
+      .limit(maxPeriod)
       .exec();
 
     return bookingAllDay;
