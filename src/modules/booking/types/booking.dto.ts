@@ -23,10 +23,6 @@ export class CreateBookingInput {
 export class UpdateBookingInput {
   @IsMongoId()
   @Type(() => Types.ObjectId)
-  userId: Types.ObjectId;
-
-  @IsMongoId()
-  @Type(() => Types.ObjectId)
   deskId: Types.ObjectId;
 
   @IsDate()

@@ -1,8 +1,8 @@
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Param, Patch, Post, UseGuards } from '@nestjs/common';
 
 import { JwtAuthGuard } from '../auth/guard/jwt-auth.guard';
 import { BookingService } from './service/booking.service';
-import { CreateBookingInput } from './types/booking.dto';
+import { CreateBookingInput, UpdateBookingInput } from './types/booking.dto';
 
 @Controller({
   path: 'booking',
@@ -15,5 +15,11 @@ export class BookingController {
   @UseGuards(JwtAuthGuard)
   createBooking(@Body() body: CreateBookingInput) {
     return this.bookingService.create(body);
+  }
+
+  @Patch(':id')
+  @UseGuards(JwtAuthGuard)
+  updateBooking(@Param() id: string, @Body() body: UpdateBookingInput) {
+    return this.bookingService.update(id, body);
   }
 }

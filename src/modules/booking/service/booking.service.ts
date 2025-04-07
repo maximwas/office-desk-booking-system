@@ -1,23 +1,23 @@
-import { ConflictException, Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { Types } from 'mongoose';
+import { BOOKING_CONFIG, BookingConfig } from 'src/core/config/booking.config';
 import { DeskRepository } from 'src/modules/desk/repository/desk.repository';
 
 import { BookingRepository } from '../repository/booking.repository';
-import { CreateBookingInput } from '../types/booking.dto';
+import { CreateBookingInput, UpdateBookingInput } from '../types/booking.dto';
 
 @Injectable()
 export class BookingService {
   constructor(
-    private readonly configService: ConfigService,
+    @Inject(BOOKING_CONFIG) private readonly bookingConfig: BookingConfig,
     private readonly bookingRep: BookingRepository,
     private readonly deskRep: DeskRepository,
   ) {}
 
   public async create(body: CreateBookingInput) {
-    const { userId, deskId } = body;
+    await this.validateBookingForCreation(body);
 
-    await this.checkBooking(body);
+    const { userId, deskId } = body;
 
     const booking = await this.bookingRep.create({
       ...body,
@@ -30,18 +30,45 @@ export class BookingService {
     return booking;
   }
 
-  public async checkBooking(body: CreateBookingInput) {
-    const { userId, deskId, startDate, endDate } = body;
-    const bookingMaxPeriod = parseInt(this.configService.getOrThrow<string>('BOOKING_MAX_PERIOD'));
-    const bookingAllDay = await this.bookingRep.findByUserAndAllDay(userId.toString(), startDate, endDate);
-    const bookingPeriodDay = await this.bookingRep.findByDeskAndPeriod(deskId.toString(), startDate, endDate);
+  public async update(id: string, body: UpdateBookingInput) {
+    await this.validateBookingForUpdate(id, body);
 
-    if (bookingAllDay.length >= bookingMaxPeriod) {
-      throw new ConflictException(`More than ${bookingMaxPeriod} desk booked`);
+    const updateBooking = this.bookingRep.updateById(id, {
+      $set: {
+        startDate: body.startDate,
+        endDate: body.endDate,
+      },
+    });
+
+    return updateBooking;
+  }
+
+  public async validateBookingForCreation(body: CreateBookingInput) {
+    const { userId, deskId, startDate, endDate } = body;
+    const bookingAllDay = await this.bookingRep.findByUserAndAllDay(userId.toString(), startDate, endDate);
+    const conflictingBookings = await this.bookingRep.findByDeskAndPeriod(deskId.toString(), startDate, endDate);
+
+    if (bookingAllDay && bookingAllDay.length >= this.bookingConfig.maxPeriod) {
+      throw new ConflictException(`More than ${this.bookingConfig.maxPeriod} desk booked`);
     }
 
-    if (bookingPeriodDay.length) {
+    if (conflictingBookings && conflictingBookings.length) {
       throw new ConflictException('Desk is already booked for this time');
+    }
+  }
+
+  public async validateBookingForUpdate(id: string, body: UpdateBookingInput) {
+    const { deskId, startDate, endDate } = body;
+    const currentBooking = await this.bookingRep.findById(id);
+
+    if (!currentBooking) {
+      throw new NotFoundException('Booking not found');
+    }
+
+    const conflictingBookings = await this.bookingRep.findByDeskAndPeriod(deskId.toString(), startDate, endDate, id);
+
+    if (conflictingBookings && conflictingBookings.length) {
+      throw new ConflictException('The desk you selected is already reserved during this time. Please choose another time.');
     }
   }
 }

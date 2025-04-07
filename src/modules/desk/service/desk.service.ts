@@ -1,6 +1,5 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { Types } from 'mongoose';
+import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BOOKING_CONFIG, BookingConfig } from 'src/core/config/booking.config';
 import { BookingRepository } from 'src/modules/booking/repository/booking.repository';
 import dayjs, { generateTimeSlots, getStartAndEndOfDay } from 'src/shared/utils/dayjs';
 
@@ -10,7 +9,7 @@ import { CreateDeskInput, UpdateDeskInput } from '../types/desk.dto';
 @Injectable()
 export class DeskService {
   constructor(
-    private readonly configService: ConfigService,
+    @Inject(BOOKING_CONFIG) private readonly bookingConfig: BookingConfig,
     private readonly deskRepo: DeskRepository,
     private readonly bookingRepo: BookingRepository,
   ) {}
@@ -33,14 +32,6 @@ export class DeskService {
     });
 
     return desk;
-  }
-
-  public async updateBookingHistory(id: string, bookingId: string) {
-    await this.deskRepo.updateById(id, {
-      $push: {
-        bookings: new Types.ObjectId(bookingId),
-      },
-    });
   }
 
   public async delete(id: string) {
@@ -74,21 +65,13 @@ export class DeskService {
     }
 
     const slots = generateTimeSlots({
-      intervalMinutes: parseInt(this.configService.getOrThrow<string>('BOOKING_INTERVAL_MINUTES')),
+      intervalMinutes: this.bookingConfig.internalMinutes,
       busySlots: bookings.map((booking) => ({
         startDate: booking.startDate,
         endDate: booking.endDate,
       })),
-      periodStart: dayjs
-        .utc(startOfDay)
-        .set('hour', parseInt(this.configService.getOrThrow<string>('BOOKING_PERIOD_START')))
-        .set('minute', 0)
-        .toDate(),
-      periodEnd: dayjs
-        .utc(endOfDay)
-        .set('hour', parseInt(this.configService.getOrThrow<string>('BOOKING_PERIOD_END')))
-        .set('minute', 0)
-        .toDate(),
+      periodStart: dayjs.utc(startOfDay).set('hour', this.bookingConfig.periodStart).set('minute', 0).toDate(),
+      periodEnd: dayjs.utc(endOfDay).set('hour', this.bookingConfig.periodEnd).set('minute', 0).toDate(),
     });
 
     return slots;
